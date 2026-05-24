@@ -104,9 +104,18 @@ export async function POST(request: Request) {
     let titlePromise: Promise<string> | null = null;
 
     if (chat) {
-      if (chat.userId !== session.user.id) {
+      // Enforce chat visibility/ownership consistently with /api/messages.
+      // For private chats, only the owner may access messages.
+      if (chat.visibility === "private" && chat.userId !== session.user.id) {
         return new ChatbotError("forbidden:chat").toResponse();
       }
+
+      // NOTE: For public chats, access is still restricted to the owner in this
+      // endpoint to prevent authorization mismatches and message disclosure.
+      if (chat.visibility !== "private" && chat.userId !== session.user.id) {
+        return new ChatbotError("forbidden:chat").toResponse();
+      }
+
       messagesFromDb = await getMessagesByChatId({ id });
     } else if (message?.role === "user") {
       await saveChat({
